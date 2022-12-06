@@ -26,22 +26,28 @@ namespace FortiClientAutoLogin.VpnLogger
                     .And(SearchQuery.SubjectContains("Token code:"));
 
                 client.Inbox.Open(FolderAccess.ReadWrite);
+                var nextUid = client.Inbox.UidNext.Value.Id;
                 while (token == null)
                 {
-                    var searchResult = client.Inbox.Search(searchQuery);
-                    if (searchResult?.Any() == true)
+                    try
                     {
-                        var tokenMessage = client.Inbox.GetMessage(searchResult.First());
-                        token = tokenMessage?.Subject.Replace("Token code:", "").Trim();
+                        var mes = client.Inbox.GetMessage(new UniqueId(nextUid));
 
-                        if (token != null)
+                        if (mes.Subject.Contains("Token code:"))
                         {
-                            client.Inbox.AddFlags(new UniqueId[] { searchResult.First() }, MessageFlags.Deleted, false);
+                            token = mes.Subject.Replace("Token code:", "").Trim();
+                            client.Inbox.AddFlags(new UniqueId(nextUid), MessageFlags.Deleted, false);
                             client.Inbox.Expunge();
+                            break;
+                        }
+                        else
+                        {
+                            nextUid++;
                         }
                     }
-                    else
+                    catch (MessageNotFoundException)
                     {
+                        client.NoOp();
                         Application.DoEvents();
                         Thread.Sleep(2000);
                     }
