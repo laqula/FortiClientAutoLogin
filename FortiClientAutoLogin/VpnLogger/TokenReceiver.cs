@@ -26,30 +26,32 @@ namespace FortiClientAutoLogin.VpnLogger
                     .And(SearchQuery.SubjectContains("Token code:"));
 
                 client.Inbox.Open(FolderAccess.ReadWrite);
-                var nextUid = client.Inbox.UidNext.Value.Id;
+                var index = (client.Inbox.Any() ? client.Inbox.Count() - 1 : 0);
                 while (token == null)
                 {
                     try
                     {
-                        var mes = client.Inbox.GetMessage(new UniqueId(nextUid));
+                        var mes = client.Inbox.GetMessage(index);
 
                         if (mes.Subject.Contains("Token code:"))
                         {
                             token = mes.Subject.Replace("Token code:", "").Trim();
-                            client.Inbox.AddFlags(new UniqueId(nextUid), MessageFlags.Deleted, false);
+                            client.Inbox.AddFlags(index, MessageFlags.Deleted, false);
                             client.Inbox.Expunge();
                             break;
                         }
                         else
                         {
-                            nextUid++;
+                            index++;
                         }
                     }
                     catch (MessageNotFoundException)
                     {
-                        client.NoOp();
-                        Application.DoEvents();
-                        Thread.Sleep(2000);
+                        Wait(client);
+                    }
+                    catch (ArgumentOutOfRangeException)
+                    {
+                        Wait(client);
                     }
                 }
 
@@ -58,6 +60,13 @@ namespace FortiClientAutoLogin.VpnLogger
             }
 
             return token;
+        }
+
+        private static void Wait(ImapClient client)
+        {
+            client.NoOp();
+            Application.DoEvents();
+            Thread.Sleep(2000);
         }
     }
 }
