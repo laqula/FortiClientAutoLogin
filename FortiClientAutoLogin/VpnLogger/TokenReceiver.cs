@@ -27,8 +27,12 @@ namespace FortiClientAutoLogin.VpnLogger
 
                 client.Inbox.Open(FolderAccess.ReadWrite);
                 var index = (client.Inbox.Any() ? client.Inbox.Count() - 1 : 0);
+                var startTime = DateTime.Now;
                 while (token == null)
                 {
+                    if (DateTime.Now.Subtract(startTime).TotalSeconds > settings.TokenWaitingTimeoutInSec)
+                        throw new TimeoutException("Token not found in inbox. Token waiting timeout.");
+
                     try
                     {
                         var mes = client.Inbox.GetMessage(index);
@@ -44,10 +48,6 @@ namespace FortiClientAutoLogin.VpnLogger
                         {
                             index++;
                         }
-                    }
-                    catch (MessageNotFoundException)
-                    {
-                        Wait(client);
                     }
                     catch (ArgumentOutOfRangeException)
                     {
