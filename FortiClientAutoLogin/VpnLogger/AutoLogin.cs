@@ -16,7 +16,13 @@ namespace FortiClientAutoLogin.VpnLogger
         internal void Login()
         {
             var settings = Settings.Read();
-            Process.Start(settings.Vpn.FortiClientExePath);
+            var vpnProcessInfo = new ProcessStartInfo() 
+            { 
+                UseShellExecute = false,
+                FileName = settings.Vpn.FortiClientExePath,
+                WorkingDirectory = settings.Vpn.FortiClientExeDirPath,
+            };
+            Process.Start(vpnProcessInfo);
             var mainWindow = FindMainWindow();
 
             WindowInteract.Click(mainWindow, 100, 100);
@@ -37,7 +43,7 @@ namespace FortiClientAutoLogin.VpnLogger
             var mainWindow = IntPtr.Zero;
             while (mainWindow == IntPtr.Zero)
             {
-                mainWindow = WindowInteract.GetWindowHandle("FortiClient -- The Security Fabric Agent");
+                mainWindow = WindowInteract.GetWindowHandle("FortiClient");
 
                 Application.DoEvents();
                 Thread.Sleep(1000);

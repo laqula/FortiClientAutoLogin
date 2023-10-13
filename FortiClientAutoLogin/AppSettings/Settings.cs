@@ -5,11 +5,13 @@ namespace FortiClientAutoLogin.AppSettings
 {
     internal class Settings
     {
+        public int TokenWaitingTimeoutInSec { get; set; }
         public VpnSettings Vpn { get; set; }
         public MailSettings Mail { get; set; }
 
         public class VpnSettings
         {
+            public string FortiClientExeDirPath { get; set; }
             public string FortiClientExePath { get; set; }
             public string Login { get; set; }
         }
