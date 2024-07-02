@@ -2,7 +2,6 @@
 using FortiClientAutoLogin.Passwords;
 using MailKit;
 using MailKit.Net.Imap;
-using MailKit.Search;
 using MailKit.Security;
 
 namespace FortiClientAutoLogin.VpnLogger
@@ -22,43 +21,57 @@ namespace FortiClientAutoLogin.VpnLogger
                     Enum.Parse<SecureSocketOptions>(settings.Mail.ImapSslOption));
                 client.Authenticate(settings.Mail.ImapLogin, PasswordManager.Load(PasswordType.EMAIL));
 
-                var searchQuery = SearchQuery.DeliveredAfter(DateTime.Now.AddMinutes(-5))
-                    .And(SearchQuery.SubjectContains("Token code:"));
+                var nextUidInbox = GetNextUid(client.Inbox);
+                var nextUidTrash = GetNextUid(client.GetFolder(SpecialFolder.Trash));
+                var nextUidJunk = GetNextUid(client.GetFolder(SpecialFolder.Junk));
 
-                client.Inbox.Open(FolderAccess.ReadWrite);
-                var index = (client.Inbox.Any() ? client.Inbox.Count() - 1 : 0);
                 var startTime = DateTime.Now;
                 while (token == null)
                 {
                     if (DateTime.Now.Subtract(startTime).TotalSeconds > settings.TokenWaitingTimeoutInSec)
                         throw new TimeoutException("Token not found in inbox. Token waiting timeout.");
 
-                    try
-                    {
-                        var mes = client.Inbox.GetMessage(index);
+                    token = CheckFolder(client.Inbox, nextUidInbox, token);
+                    token = CheckFolder(client.GetFolder(SpecialFolder.Trash), nextUidTrash, token);
+                    token = CheckFolder(client.GetFolder(SpecialFolder.Junk), nextUidJunk, token);
 
-                        if (mes.Subject.Contains("Token code:"))
-                        {
-                            token = mes.Subject.Replace("Token code:", "").Trim();
-                            client.Inbox.AddFlags(index, MessageFlags.Deleted, false);
-                            client.Inbox.Expunge();
-                            break;
-                        }
-                        else
-                        {
-                            index++;
-                        }
-                    }
-                    catch (ArgumentOutOfRangeException)
+                    if (token == null)
                     {
                         Wait(client);
                     }
                 }
 
-                client.Inbox.Close();
                 client.Disconnect(true);
             }
 
+            return token;
+        }
+
+        private UniqueId GetNextUid(IMailFolder folder)
+        {
+            folder.Open(FolderAccess.ReadWrite);
+            var nextUid = folder.UidNext.Value;
+            folder.Close();
+            return nextUid;
+        }
+
+        private string CheckFolder(IMailFolder folder, UniqueId nextUid, string token)
+        {
+            try
+            {
+                folder.Open(FolderAccess.ReadWrite);
+                var mes = folder.GetMessage(nextUid);
+
+                if (token == null && mes.Subject.Contains("Token code:"))
+                {
+                    token = mes.Subject.Replace("Token code:", "").Trim();
+                    folder.AddFlags(nextUid, MessageFlags.Deleted, false);
+                    folder.Expunge();
+                }
+            }
+            catch (MessageNotFoundException) { }
+
+            folder.Close();
             return token;
         }
 
